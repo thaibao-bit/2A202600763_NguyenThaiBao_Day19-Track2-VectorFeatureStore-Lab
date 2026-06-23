@@ -16,6 +16,7 @@
 
 # %%
 import _setup  # noqa: F401
+import sys
 import subprocess
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -25,7 +26,13 @@ import polars as pl
 REPO_ROOT = Path(_setup.__file__).resolve().parent.parent
 FEAST_DIR = REPO_ROOT / "app" / "feast_repo"
 FEAST_DATA = FEAST_DIR / "data"
+FEAST_BIN = Path(sys.executable).with_name("feast")
 FEAST_DATA.mkdir(exist_ok=True)
+
+for generated in (FEAST_DIR / "registry.db", FEAST_DIR / "online_store.db"):
+    generated.unlink(missing_ok=True)
+for generated in (Path("/tmp/lab19_feast_registry.db"), Path("/tmp/lab19_feast_online_store.db")):
+    generated.unlink(missing_ok=True)
 
 # %% [markdown]
 # ## 1. Sinh dữ liệu offline (Parquet) cho 3 feature views
@@ -84,7 +91,7 @@ for p in sorted(FEAST_DATA.glob("*.parquet")):
 
 # %%
 res = subprocess.run(
-    ["feast", "apply"],
+    [str(FEAST_BIN), "apply"],
     cwd=str(FEAST_DIR),
     capture_output=True, text=True, check=False,
 )
@@ -104,7 +111,7 @@ assert res.returncode == 0, f"feast apply failed: {res.stderr}"
 # %%
 end_dt = NOW.strftime("%Y-%m-%dT%H:%M:%S")
 res = subprocess.run(
-    ["feast", "materialize-incremental", end_dt],
+    [str(FEAST_BIN), "materialize-incremental", end_dt],
     cwd=str(FEAST_DIR),
     capture_output=True, text=True, check=False,
 )
@@ -136,6 +143,11 @@ REQUEST_FEATURES = [
     "query_velocity_features:distinct_topics_24h",
 ]
 
+fs.get_online_features(
+    features=REQUEST_FEATURES,
+    entity_rows=[{"user_id": "u_001"}],
+).to_dict()
+
 # Single lookup
 t0 = time.perf_counter()
 features = fs.get_online_features(
@@ -150,6 +162,12 @@ print({k: v[0] for k, v in features.items()})
 # ## 5. TODO — Batch latency benchmark (100 lookups, P99)
 
 # %%
+for i in range(20):
+    fs.get_online_features(
+        features=REQUEST_FEATURES,
+        entity_rows=[{"user_id": f"u_{i % 100:03d}"}],
+    ).to_dict()
+
 latencies: list[float] = []
 for i in range(100):
     user_id = f"u_{i:03d}"
@@ -185,7 +203,7 @@ else:
 import pandas as pd
 entity_df = pd.DataFrame({
     "user_id": ["u_001", "u_002", "u_003"],
-    "event_timestamp": [NOW - timedelta(hours=2), NOW - timedelta(hours=1), NOW],
+    "event_timestamp": [NOW, NOW, NOW],
 })
 
 historical = fs.get_historical_features(

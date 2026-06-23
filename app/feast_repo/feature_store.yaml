@@ -1,9 +1,9 @@
 project: lab19
 provider: local
-registry: registry.db
+registry: /tmp/lab19_feast_registry.db
 online_store:
   type: sqlite
-  path: online_store.db
+  path: /tmp/lab19_feast_online_store.db
 offline_store:
   type: file
 entity_key_serialization_version: 3
