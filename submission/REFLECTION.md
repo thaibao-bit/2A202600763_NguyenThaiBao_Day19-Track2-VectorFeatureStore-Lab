@@ -1,7 +1,7 @@
 # Reflection — Lab 19
 
 **Tên:** Nguyễn Thái Bảo
-**Cohort:** A20
+**Cohort:** A20 K2
 **Path đã chạy:** lite
 
 ---
